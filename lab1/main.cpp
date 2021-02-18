@@ -11,30 +11,11 @@
 #include <map>
 #include <algorithm>
 
+#include "finite_recursive.h"
+#include "finite_graph.h"
+
 using namespace std;
 
-//some extra prints
-#define DEBUG 1
-
-// Converts string "S=abcS" into pair S/abcS
-pair<char, string> strToProdSet(string inp);
-
-// Checks if this char is inside of any string in inp_v vector
-bool checkInArray(char inp_c, vector<string> inp_v);
-
-/* Recursively check is a production sets of current_nonterm can trim source string
- * To check if input string can be created by defined alphabet I am trying to trim it down to 0 using productions set
- * example:
- * S=bbP
- * P=bd
- * input=bbbd
- * 1) bbbd - S = bd with current_nonterm P
- * 2) bd = P[0] -> true
- */
-bool recursiveCheck(string source_string, char current_nonterm, map<char, vector<string>> prod_set);
-
-// check is src is sub string of dst starting from first character
-bool isSubstr(string src, string dst);
 
 int main() {
 
@@ -117,7 +98,7 @@ int main() {
 
         productionSet[tmpProdPair.first].push_back(tmpProdPair.second);
     }
-
+    cout << "\nEnter a string to check it by finite automaton\n >> ";
     // Input word
     cin >> input;
 
@@ -132,8 +113,17 @@ int main() {
         }
     }
 
-    // Checking if such word can be actually generated
-    bool result = recursiveCheck(input, 'S', productionSet);    // We start with nonterm S
+    bool result = false;
+    if(METHOD == 1){
+        Graph grph(productionSet);
+        result = grph.checkWord(input);
+    }
+    else if(METHOD == 2){
+        result = recursiveCheck(input, 'S', productionSet);
+    }
+    else{
+        cout << "wrong method specified\n";
+    }
 
 
     if (result == true) {
@@ -144,41 +134,3 @@ int main() {
     return 0;
 }
 
-pair<char, string> strToProdSet(string inp) {
-    pair<char, string> output;
-    output.first = inp[0];
-    output.second = inp.substr(2, inp.size() - 2);
-    return output;
-}
-
-bool checkInArray(char inp_c, vector<string> inp_v) {
-    for (int idx = 0; idx < inp_v.size(); idx++) {
-        if (inp_v[idx].find(inp_c) != string::npos)return true;
-    }
-    return false;
-}
-
-bool recursiveCheck(string source_string, char current_nonterm, map<char, vector<string>> prod_set) {
-    if (source_string.size() == 0)return true;  // Check if string is abolutely trimmed
-
-    for (int idx = 0; idx < prod_set[current_nonterm].size(); idx++) {  // Go thro every production of current_nonterm
-        bool res = false;
-        string prodSetVal = prod_set[current_nonterm][idx]; // Current production, for ex: abcS
-        if (prodSetVal == source_string)return true;        // If current production is same as source string - exit
-        if (isSubstr(prodSetVal, source_string)) {          // If current production is substring of source string -
-            res = recursiveCheck(                           // trim source string and recursively check for next nonterm
-                    source_string.substr(prodSetVal.size() - 1, source_string.size() - (prodSetVal.size() - 1)),
-                    *(prodSetVal.end() - 1), prod_set);
-        }
-        if (res)return true;
-    }
-    return false;   // TRY DELETING THIS LINES IF IT FAILS, MAYBE IT WILL FIX IT
-}
-
-bool isSubstr(string src, string dst) {
-    for (int idx = 0; idx < src.size(); idx++) {
-        if (isupper(src[idx]) && idx != 0)return true;
-        if (src[idx] != dst[idx])return false;
-    }
-    return true;
-}
