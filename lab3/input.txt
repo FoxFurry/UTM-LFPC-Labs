@@ -1,0 +1,21 @@
+# This is comment line.
+# For epsilon (e) use '0'
+# Tabulations/spaces are ignored, you can format data however you want
+# Program will look only for the first P occurrence, others will be ignored
+# Whitespace characters are ignored.
+# Each production set should start on new line. First set should be on next line after P
+# "P = { S->AC," <- will cause error
+
+P =   {
+    S->AC,
+    S->bA,
+    S->B,
+    S->aA,
+    A->0,
+    A->aS,
+    A->ABAb,
+    B->a,
+    B->AbSA,
+    C->abC,
+    D->AB
+}
