@@ -51,10 +51,13 @@ func main() {
 Reads production set from file
 If file format is bad it will panic
 
-Void
+Parameters:
+	pInputFile - pointer to file from which production sets will be read
+	pDfaMap - pointer of map string->[]string which will be populated with production sets
+Return:
+	void
  */
 func readFile(pInputFile *os.File, pDfaMap *map[string][]string) {
-
 	productionRegex := regexp.MustCompile("^(\\s*)[Pp](\\s*)=(\\s*){(\\s*)$")	// 'P={' or 'p  =    {'
 	setRegex := regexp.MustCompile("^[a-zA-Z](\\s*)->(\\s*)[a-zA-Z0]+(,?)$")	// 'A->ABC' or 'A->ABC,'
 	setSplitRegex := regexp.MustCompile("->|,")								// Splits 'A->ABC,' to ['A', 'ABC']
@@ -114,15 +117,16 @@ func readFile(pInputFile *os.File, pDfaMap *map[string][]string) {
 Deletes epsilon productions from map and generates inverse map for this set
 Return value shows if epsilon productions were found in map
 
-False -> No epsilon production were found and map is unchanged
-True -> Epsilon production were eliminated and map was changed
+Parameters:
+	pDfaMap - pointer of map string->[]string from which epsilon productions will be eliminated
+Return:
+	void
  */
 func eliminateEps(pDfaMap *map[string][]string){
 	for key, value := range *pDfaMap {
 		for idx, set := range value {
 			if set == "0" {		// If it is an epsilon set - eliminate it and generate inverse
 				(*pDfaMap)[key] = fastRemove((*pDfaMap)[key], idx)
-				//idx--
 				addInverseProductions(pDfaMap, rune(key[0]))
 			}
 		} //forMapValue
@@ -174,51 +178,82 @@ func addInverseProductions(pDfaMap *map[string][]string, searchElem rune){
 /*
 Deletes renamings
 Return value shows if renaming
+
+Parameters:
+	pDfaMap - pointer of map string->[]string from which renaming productions will be eliminated
+Return:
+	void
  */
 func eliminateRenaming(pDfaMap *map[string][]string){
 	for key, value := range *pDfaMap {
 		for idx, set := range value {
 			if len(set) == 1 && set[0] >= 'A' && set[0] <= 'Z' {	// If we have a renaming
-				(*pDfaMap)[key] = fastRemove((*pDfaMap)[key], idx)
-				generateRenamingProductions(pDfaMap, key, set)
+				(*pDfaMap)[key] = fastRemove((*pDfaMap)[key], idx)	// Delete the renaming set
+				generateRenamingProductions(pDfaMap, key, set)		// Generate all necessary productions after renaming
 			}
 		} //forMapValue
 	} //forMap
 } //eliminateRenaming
 
+/*
+Generates productions after deleting renaming
 
+If "S->B" is our production, 'S' is targetKey and 'B' is renameKey
+They are actually characters, not strings, but my map keys are strings so I left them as strings
+
+Parameters:
+	pDfaMap - pointer of map string->[]string for which will be generated productions
+	targetKey - key for which will be generated
+	renameKey - key from which will be generated
+Return:
+	void
+ */
 func generateRenamingProductions(pDfaMap *map[string][]string, targetKey string, renameKey string){
 	println("Eliminating renaming " + targetKey + "->" + renameKey)
 
-	for _, set := range (*pDfaMap)[renameKey] {
-		_, isPresent := find((*pDfaMap)[targetKey], set)
-		if !isPresent {
+	for _, set := range (*pDfaMap)[renameKey] {				// Go through every renameKey set
+		_, isPresent := find((*pDfaMap)[targetKey], set)	// Check is such set already exists in targetKey
+		if !isPresent {										// If not -> add it
 			(*pDfaMap)[targetKey] = append((*pDfaMap)[targetKey], set)
 		}
-	}
+	} //forSet
 } //generateRenamingProductions
 
+
+/*
+Eliminates non productive sets from map
+
+Basically it searched for productive keys and after search - eliminates all other keys
+
+Parameters:
+	pDfaMap - pointer of map string->[]string from which non productive sets will be eliminated
+Return:
+	void
+ */
 func eliminateNonProductive(pDfaMap *map[string][]string){
-	isVnProductiveMap := map[string]bool{}
+	isVnProductiveMap := map[string]bool{}					// This map will contain productive keys
+															// I know it can be changed to just array, but maps have
+															// O(nlogn) search complexity and I search a lot
 	var hasChanged = false
-	for {
-		hasChanged = false
-		for key, value := range *pDfaMap {
-			if isVnProductiveMap[key] { continue }
-			for _, set := range value {
-				var setStatus = true
-				for _, element := range set {
-					if element >= 'A' && element <= 'Z' {
-						if isVnProductiveMap[string(element)] == false {
-							setStatus = false
+
+	for {													// Here we start searching productive keys
+		hasChanged = false									// We are iterating infinitely and this flag will stop us
+		for key, value := range *pDfaMap {					// Take every key and set for this key
+			if isVnProductiveMap[key] { continue }			// Is this key is already productive - skip
+			for _, set := range value {						// Go through every set
+				var setStatus = true						// This flag is set to false if this set is non productive
+				for _, element := range set {				// Go through set elements
+					if element >= 'A' && element <= 'Z' {	// If we see non terminal symbol
+						if isVnProductiveMap[string(element)] == false {	// Check is non terminal is productive
+							setStatus = false				// If not - all set is non productive
 							break
-						}
+						}									// Basically I check if every symbol in set is productive
 					}
 				} //forMapValueElement
-				if setStatus {
-					isVnProductiveMap[key] = true
-					hasChanged = true
-					break
+				if setStatus {								// If it is productive
+					isVnProductiveMap[key] = true			// Set key as true
+					hasChanged = true						// We have changed out productive map, so we should iterate
+					break									// one more time
 				}
 			} //forMapValue
 		} //forMap
@@ -233,12 +268,12 @@ func eliminateNonProductive(pDfaMap *map[string][]string){
 
 	for key, value := range *pDfaMap {
 		valueRange := len(value)
-		for idx := 0; idx < valueRange; idx++ {
+		for idx := 0; idx < valueRange; idx++ {		// I have to use normal loop because of "going back" in loop
 			set := value[idx]
 			for _, element := range set {
-				if element >= 'A' && element <= 'Z' {
-					if isVnProductiveMap[string(element)] == false {
-						println("Deleting set: " + key + "->" + set)
+				if element >= 'A' && element <= 'Z' {	// If we found a non terminal symbol
+					if isVnProductiveMap[string(element)] == false {	// Check if it is not productive
+						println("Deleting set: " + key + "->" + set)	// If it is not - delete it
 						(*pDfaMap)[key] = fastRemove((*pDfaMap)[key], idx)
 						if len((*pDfaMap)[key]) == 0 {
 							delete(*pDfaMap, key)
@@ -254,6 +289,14 @@ func eliminateNonProductive(pDfaMap *map[string][]string){
 
 } //eliminateNonProductive
 
+/*
+Eliminates inaccessible sets from map
+
+Parameters:
+	pDfaMap - pointer of map string->[]string from which inaccessible sets will be eliminated
+Return:
+	void
+ */
 func eliminateInaccessible(pDfaMap *map[string][]string){
 	isVnAccessibleMap := map[string]bool{}
 
@@ -263,7 +306,7 @@ func eliminateInaccessible(pDfaMap *map[string][]string){
 				if element >= 'A' && element <= 'Z' {
 					isVnAccessibleMap[string(element)] = true	// Add to map every non terminal symbol we see in RHS
 				}
-			} //forMapElement
+			} //forMapValueElement
 		} //forMapValue
 	} //forMap
 
@@ -272,10 +315,18 @@ func eliminateInaccessible(pDfaMap *map[string][]string){
 			println(key + " is inaccessible. Deleting it")
 			delete(*pDfaMap, key)
 		}
-	}
+	} //forMap
 
 } //eliminateInaccessible
 
+/*
+Finally - transforms our grammar to CNF
+
+Parameters:
+	pDfaMap - pointer of map string->[]string which will obtain CNF after this function
+Return:
+	void
+*/
 func obtainCNF(pDfaMap *map[string][]string) {
 	chosmkyMap := map[string]string{}
 	chomskyRegex := regexp.MustCompile("^([A-Z]{2})$|^([a-z])$") 	// This regex checks if production is CNF
@@ -285,44 +336,74 @@ func obtainCNF(pDfaMap *map[string][]string) {
 
 	for key, value := range *pDfaMap{
 		for idx, set := range value{
-			if !chomskyRegex.MatchString(set) {
-				(*pDfaMap)[key][idx] = recursiveOptimize(&chosmkyMap, set, &lastX, &lastY)
+			if !chomskyRegex.MatchString(set) {												// If current set is not CNF
+				(*pDfaMap)[key][idx] = recursiveOptimize(&chosmkyMap, set, &lastX, &lastY)	// Optimize it
 			}
 		} //forMapValue
 	} //forMap
 
-	for key, value := range chosmkyMap {
+	for key, value := range chosmkyMap {	// After optimizing each set, add sets from chomskyMap to pDfaMap
 		(*pDfaMap)[key] = []string{value}
 	}
 }
 
+/*
+This function optimizes set recursively till it is CNF, it will also create CNF for every subset of this set
+
+Parameters:
+	pChomskyMap - pointer on map with CNF elements
+	set - a set string which will be CNF-ed
+	addType - either 'X' or 'Y'
+	addTypeCounter - counter for addType, used to control number of addType elements
+Return:
+	string - a new set, basically a CNF of original set
+*/
 func recursiveOptimize(pChomskyMap *map[string]string, set string, pLastX *int, pLastY *int) string{
 	var returnSet = ""
-
-	if len(set) <= 2 {
+	// By the way, '== 2' should also work in this condition, cuz sets of len 1 are passed by regex and cannot be here
+	if len(set) <= 2 {						// There are 2 cases, if len of set if <=2 - we can finally get CNF
 		for idx, element := range set{
-			if isLowerChar(element) {
-				returnSet = set[:idx] + set[idx+1:]
-				returnSet += addOrGetValue(pChomskyMap, string(element),'X', pLastX)
+			if isLowerChar(element) {  		// Even with <=2 symbols we can still have terminal symbols
+				returnSet = set[:idx] + set[idx+1:]	// Delete terminal character
+				returnSet += addOrGetValue(pChomskyMap, string(element),'X', pLastX) // Add a key with value...
+																						//...of this terminal character
 				return returnSet
 			}
 		}
-	}else {
-		for idx, element := range set {
-			if element >= 'A' && element <= 'Z' {
-				returnSet = string(element)
-				set = set[:idx] + set[idx+1:]
-				break
+	}else {									// If len is >2 - we need to optimize it further
+		for idx, element := range set {		// Go through every element
+			if element >= 'A' && element <= 'Z' {	// If it is non terminal
+				returnSet = string(element)			// We add to return state
+				set = set[:idx] + set[idx+1:]		// Take the rest of string (without this exact non terminal)
+				break								// ... and break
 			}
 		}
+		// Boy this function is very spooky and dangerous, but it basically does all the job
+		// It optimizes our set to "maximum" possible level and after this we create a value for it (or get if exist)
+		// You can see I am suing 'Y' type, because Y will always contain 'AB' form (2 non term) as value
 		return returnSet + addOrGetValue(pChomskyMap, recursiveOptimize(pChomskyMap, set, pLastX, pLastY), 'Y', pLastY)
 	}
 	return "If you see this -> something terrible happened on run-time"
 }
 
+
+/*
+This function has 2 use cases:
+If 'set' does not exist in map - add it to the map, increase counters and return new key fo this value
+If 'set' exists - return key for it
+
+Return key is always of form 'addType + [0 .. addTypeCounter]' e.g 'X1', 'Y5', 'X666'
+
+Parameters:
+	pChomskyMap - pointer on map with CNF elements
+	set - a set string which we will search inside of map
+	addType - either 'X' or 'Y'
+	addTypeCounter - counter for addType, used to control number of addType elements
+Return:
+	key
+ */
 func addOrGetValue(pChomskyMap *map[string]string, set string,addType rune, addTypeCounter *int) string{
 	isPresent := containsValue(*pChomskyMap, set)
-
 	if isPresent != "" {
 		return isPresent
 	}else{
@@ -333,6 +414,15 @@ func addOrGetValue(pChomskyMap *map[string]string, set string,addType rune, addT
 	}
 }
 
+/*
+Checks if map contains some specific value in any key.
+
+Parameters:
+	m - map string->string in which we search the value
+Return:
+	key - if value is found in map
+	"" - otherwise
+ */
 func containsValue(m map[string]string, v string) string {
 	for key, x := range m {
 		if x == v {
@@ -345,6 +435,7 @@ func containsValue(m map[string]string, v string) string {
 // -----------------------------------
 // UTILS
 
+// Do I need to explain this?
 func printDfa(_dfaMap map[string][]string){
 	println()
 	for key, value := range _dfaMap {
@@ -355,11 +446,16 @@ func printDfa(_dfaMap map[string][]string){
 	}
 } //printDfa
 
+/*
+Removes element from a string slice and returns new string
+ */
 func fastRemove(s []string, i int) []string {
 	return append(s[:i], s[i+1:]...)
 } //fastRemove
 
-
+/*
+Finds if 'val' is present in slice
+ */
 func find(slice []string, val string) (int, bool) {
 	for i, item := range slice {
 		if item == val {
@@ -369,14 +465,6 @@ func find(slice []string, val string) (int, bool) {
 	return -1, false
 } //find
 
-//func isLowerString(val string) bool {
-//	return val == strings.ToLower(val)
-//} //isLowerString
-//
-//func isUpperString(val string) bool {
-//	return val == strings.ToUpper(val)
-//}
-//
 func isLowerChar(val rune) bool {
 	return val >= 'a' && val <= 'z'
 } //isLowerChar
