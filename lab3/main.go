@@ -40,6 +40,11 @@ func main() {
 	eliminateInaccessible(&dfaArray)
 	printDfa(dfaArray)
 
+	print("\nObtaining CNF\n\n")
+
+	obtainCNF(&dfaArray)
+	printDfa(dfaArray)
+
 }
 
 /*
@@ -52,7 +57,7 @@ func readFile(pInputFile *os.File, pDfaMap *map[string][]string) {
 
 	productionRegex := regexp.MustCompile("^(\\s*)[Pp](\\s*)=(\\s*){(\\s*)$")	// 'P={' or 'p  =    {'
 	setRegex := regexp.MustCompile("^[a-zA-Z](\\s*)->(\\s*)[a-zA-Z0]+(,?)$")	// 'A->ABC' or 'A->ABC,'
-	setSplitRegex := regexp.MustCompile("-\\>|,")								// Splits 'A->ABC,' to ['A', 'ABC']
+	setSplitRegex := regexp.MustCompile("->|,")								// Splits 'A->ABC,' to ['A', 'ABC']
 
 	lineRead := bufio.NewScanner(pInputFile)
 
@@ -256,20 +261,86 @@ func eliminateInaccessible(pDfaMap *map[string][]string){
 		for _, set := range value {
 			for _, element := range set {
 				if element >= 'A' && element <= 'Z' {
-					isVnAccessibleMap[string(element)] = true
+					isVnAccessibleMap[string(element)] = true	// Add to map every non terminal symbol we see in RHS
 				}
 			} //forMapElement
 		} //forMapValue
 	} //forMap
 
-	for key, _ := range *pDfaMap {
-		if !isVnAccessibleMap[key] {
+	for key := range *pDfaMap {
+		if !isVnAccessibleMap[key] {	// If such non terminal is not in map -> it is inaccessible
 			println(key + " is inaccessible. Deleting it")
 			delete(*pDfaMap, key)
 		}
 	}
 
 } //eliminateInaccessible
+
+func obtainCNF(pDfaMap *map[string][]string) {
+	chosmkyMap := map[string]string{}
+	chomskyRegex := regexp.MustCompile("^([A-Z]{2})$|^([a-z])$") 	// This regex checks if production is CNF
+
+	lastX := 1
+	lastY := 1
+
+	for key, value := range *pDfaMap{
+		for idx, set := range value{
+			if !chomskyRegex.MatchString(set) {
+				(*pDfaMap)[key][idx] = recursiveOptimize(&chosmkyMap, set, &lastX, &lastY)
+			}
+		} //forMapValue
+	} //forMap
+
+	for key, value := range chosmkyMap {
+		(*pDfaMap)[key] = []string{value}
+	}
+}
+
+func recursiveOptimize(pChomskyMap *map[string]string, set string, pLastX *int, pLastY *int) string{
+	var returnSet = ""
+
+	if len(set) <= 2 {
+		for idx, element := range set{
+			if isLowerChar(element) {
+				returnSet = set[:idx] + set[idx+1:]
+				returnSet += addOrGetValue(pChomskyMap, string(element),'X', pLastX)
+				return returnSet
+			}
+		}
+	}else {
+		for idx, element := range set {
+			if element >= 'A' && element <= 'Z' {
+				returnSet = string(element)
+				set = set[:idx] + set[idx+1:]
+				break
+			}
+		}
+		return returnSet + addOrGetValue(pChomskyMap, recursiveOptimize(pChomskyMap, set, pLastX, pLastY), 'Y', pLastY)
+	}
+	return "If you see this -> something terrible happened on run-time"
+}
+
+func addOrGetValue(pChomskyMap *map[string]string, set string,addType rune, addTypeCounter *int) string{
+	isPresent := containsValue(*pChomskyMap, set)
+
+	if isPresent != "" {
+		return isPresent
+	}else{
+		var chomskyKey = string(addType) + strconv.Itoa(*addTypeCounter)
+		*addTypeCounter++
+		(*pChomskyMap)[chomskyKey] = set
+		return chomskyKey
+	}
+}
+
+func containsValue(m map[string]string, v string) string {
+	for key, x := range m {
+		if x == v {
+			return key
+		}
+	}
+	return ""
+}
 
 // -----------------------------------
 // UTILS
@@ -288,6 +359,7 @@ func fastRemove(s []string, i int) []string {
 	return append(s[:i], s[i+1:]...)
 } //fastRemove
 
+
 func find(slice []string, val string) (int, bool) {
 	for i, item := range slice {
 		if item == val {
@@ -297,10 +369,14 @@ func find(slice []string, val string) (int, bool) {
 	return -1, false
 } //find
 
-func isLowerString(val string) bool {
-	return val == strings.ToLower(val)
-} //isLowerString
-
+//func isLowerString(val string) bool {
+//	return val == strings.ToLower(val)
+//} //isLowerString
+//
+//func isUpperString(val string) bool {
+//	return val == strings.ToUpper(val)
+//}
+//
 func isLowerChar(val rune) bool {
 	return val >= 'a' && val <= 'z'
 } //isLowerChar
