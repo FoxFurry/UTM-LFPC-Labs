@@ -20,6 +20,9 @@ func main() {
 	readFile(fileData, &dfaArray)
 	printDfa(dfaArray)
 
+	dfaAfterRead := map[string][]string{}
+	for k,v := range dfaArray { dfaAfterRead[k] = v}
+
 	print("\nEliminating epsilon productions\n\n")
 
 	eliminateEps(&dfaArray)
@@ -44,6 +47,13 @@ func main() {
 
 	obtainCNF(&dfaArray)
 	printDfa(dfaArray)
+
+	print("\n---------------------------\nBefore CNF\n\n")
+	printDfa(dfaAfterRead)
+
+	print("\n---------------------------\nAfter CNF\n\n")
+	printDfa(dfaArray)
+
 
 }
 
@@ -439,9 +449,8 @@ func containsValue(m map[string]string, v string) string {
 func printDfa(_dfaMap map[string][]string){
 	println()
 	for key, value := range _dfaMap {
-		println(key + " -> ")
 		for _, set := range value {
-			println("     " + set)
+			println(key + " -> " + set)
 		}
 	}
 } //printDfa
@@ -468,3 +477,5 @@ func find(slice []string, val string) (int, bool) {
 func isLowerChar(val rune) bool {
 	return val >= 'a' && val <= 'z'
 } //isLowerChar
+
+
