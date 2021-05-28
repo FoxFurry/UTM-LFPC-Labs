@@ -2,8 +2,7 @@
  * What's bad about this implementation?
  * - No error handling, almost
  * - Big input restrictions (absolutely covers task inputs, but in global term they are big)
- * IMPORTANT! IF IT WILL EVENTUALLY FAIL - PLEASE DELETE LINE NUMBER 172 <return false;> I KNOW THIS SOUNDS STUPID SORRY
- */
+*/
 
 
 #include <iostream>
